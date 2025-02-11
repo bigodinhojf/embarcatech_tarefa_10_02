@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(embarcatech_tarefa_10_02 embarcatech_tarefa_10_02.c )
+add_executable(embarcatech_tarefa_10_02 embarcatech_tarefa_10_02.c inc/ssd1306.c)
 
 pico_set_program_name(embarcatech_tarefa_10_02 "embarcatech_tarefa_10_02")
 pico_set_program_version(embarcatech_tarefa_10_02 "0.1")
@@ -55,6 +55,9 @@ target_include_directories(embarcatech_tarefa_10_02 PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(embarcatech_tarefa_10_02 
+        hardware_i2c
+        hardware_adc
+        hardware_pwm
         
         )
 
