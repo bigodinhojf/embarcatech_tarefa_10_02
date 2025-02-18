@@ -29,7 +29,7 @@ ssd1306_t ssd; // Inicializa a estrutura do display
 // ADC
 #define vry_min_meio 1986.0 // Define o valor mínimo para considerar o joystick no meio em Y
 #define vry_max_meio 2085.0 // Define o valor máximo para considerar o joystick no meio em Y
-#define vrx_min_meio 2041.0 // Define o valor mínimo para considerar o joystick no meio em X
+#define vrx_min_meio 2044.0 // Define o valor mínimo para considerar o joystick no meio em X
 #define vrx_max_meio 2204.0 // Define o valor máximo para considerar o joystick no meio em X
 
 // Variáveis globais
