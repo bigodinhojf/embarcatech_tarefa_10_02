@@ -28,9 +28,9 @@ Este projeto implementa o controle de LEDs RGB e a exibição de um quadrado 8x8
   - O LED Azul tem seu brilho ajustado pelo valor do eixo Y do joystick, sendo apagado no centro e máximo nas extremidades cima e baixo.
   - O LED Vermelho tem seu brulho ajustado pelo valor do eixo X do joystick, sendo apagado no centro e máximo nas extremidades direita e esquerda.
   - Observei que o Joystick solto não fica com o valor central fixo de 2047, então fiz testes utilizando o monitor serial e defini os valores máximos e mínimos para considerar o joystick no centro para X e Y:
---------------------------------- AQUI ENTRA UMA IMAGEM ---------------------------------
+![Valores médios de VRY e VRX](Valores_de_VRY_e_VRX.png)
   - Com esses valores desenvolvi as equações que definem o valor da intensidade de cada LED a partir de uma lógica de adimensionalização, o desenvolvimento das equações está exposto na imagem a seguir:
---------------------------------- AQUI ENTRA UMA IMAGEM ---------------------------------
+![Equações desenvolvidas](Equacoes_desenvolvidas.png)
 
 2. Exibir um quadrado de 8x8 pixels no display que se move:
 
