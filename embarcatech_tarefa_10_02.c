@@ -95,12 +95,13 @@ void led_level(uint16_t value_vry, uint16_t value_vrx){
     pwm_set_gpio_level(LED_Red, LED_Red_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Vermelho
 }
 
+// Função que define a posição do quadrado de 8x8 pixels
 void rect_position(uint16_t value_vry, uint16_t value_vrx){
-    uint y = (1-(value_vry/pwm_wrap))*54;
-    uint x = (value_vrx/pwm_wrap)*118;
+    uint y = (1-(value_vry/pwm_wrap))*54; // Admensionaliza, multiplica pelo valor máximo e inverte o valor
+    uint x = (value_vrx/pwm_wrap)*118; // Admensionaliza e multiplica pelo valor máximo
     ssd1306_fill(&ssd, false); // Limpa o display
     ssd1306_rect(&ssd, y, x, 8, 8, true, gpio_get(LED_Green)); // Desenha um retângulo
-    ssd1306_rect_pont(&ssd, 0, 0, 127, 63, true, false, space);
+    ssd1306_rect_pont(&ssd, 0, 0, 127, 63, true, false, space); // Desenha a borda pontilhada
 }
 
 // -- Função principal
