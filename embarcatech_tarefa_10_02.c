@@ -71,30 +71,24 @@ void gpio_irq_handler(uint gpio, uint32_t events){
 void led_level(uint16_t value_vry, uint16_t value_vrx){
     // Define o valor do nível de intensidade do LED Azul
     if(value_vry < vry_min_meio){
-        // "(value_vry/vry_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-        // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
+        // Explicação da equação está no arquivo "Equações desenvolvidas.png"
         LED_Blue_level = (pwm_wrap-(value_vry/vry_min_meio)*pwm_wrap);
     }else if(value_vry > vry_max_meio){
-        // "((value_vry - vry_max_meio)/(pwm_wrap - vry_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        // Explicação da equação está no arquivo "Equações desenvolvidas.png"
         LED_Blue_level = (((value_vry-vry_max_meio)/(pwm_wrap-vry_max_meio))*pwm_wrap);
     }else{
-        LED_Blue_level = 0; // Estando no meio (Entre 1986 - 2084) o LED fica apagado
+        LED_Blue_level = 0; // Estando no meio (Entre 1986 - 2085) o LED fica apagado
     }
 
     // Define o valor do nível de intensidade do LED Vermelho
     if(value_vrx < vrx_min_meio){
-        // "(value_vrx/vrx_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-        // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
+        // Explicação da equação está no arquivo "Equações desenvolvidas.png"
         LED_Red_level = (pwm_wrap-(value_vrx/vrx_min_meio)*pwm_wrap);
     }else if(value_vrx > vrx_max_meio){
-        // "((value_vrx - vrx_max_meio)/(pwm_wrap - vrx_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        // Explicação da equação está no arquivo "Equações desenvolvidas.png"
         LED_Red_level = (((value_vrx-vrx_max_meio)/(pwm_wrap-vrx_max_meio))*pwm_wrap);
     }else{
-        LED_Red_level = 0; // Estando no meio (Entre 2040 - 2202) o LED fica apagado
+        LED_Red_level = 0; // Estando no meio (Entre 2044 - 2204) o LED fica apagado
     }
 
     pwm_set_gpio_level(LED_Blue, LED_Blue_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Azul
