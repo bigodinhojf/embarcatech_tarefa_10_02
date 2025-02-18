@@ -28,13 +28,16 @@ ssd1306_t ssd; // Inicializa a estrutura do display
 
 // ADC
 #define vry_min_meio 1986.0 // Define o valor mínimo para considerar o joystick no meio em Y
-#define vry_max_meio 2084.0 // Define o valor máximo para considerar o joystick no meio em Y
+#define vry_max_meio 2085.0 // Define o valor máximo para considerar o joystick no meio em Y
 #define vrx_min_meio 2041.0 // Define o valor mínimo para considerar o joystick no meio em X
-#define vrx_max_meio 2202.0 // Define o valor máximo para considerar o joystick no meio em X
+#define vrx_max_meio 2204.0 // Define o valor máximo para considerar o joystick no meio em X
 
 // Variáveis globais
 volatile uint16_t LED_Blue_level = 0; // Guarda o valor do nível de intensidade do LED Azul
 volatile uint16_t LED_Red_level = 0; // Guarda o valor do nível de intensidade do LED Vermelho
+static volatile uint32_t last_time = 0; // Armazena o tempo do último clique dos botões
+volatile bool pwm_activate = true; // Armazena a informação se os LEDs PWM estão ativos
+volatile uint8_t space = 1; // Armazena o espaçamento da borda pontilhada
 
 // Função para fazer a configuração de PWM para GPIO
 void pwm_init_gpio(uint gpio, uint wrap){
@@ -42,6 +45,68 @@ void pwm_init_gpio(uint gpio, uint wrap){
     uint slice = pwm_gpio_to_slice_num(gpio); // Guarda o canal do PWM
     pwm_set_wrap(slice, wrap); // Define o valor do Wrap do canal correspondente
     pwm_set_enabled(slice, true); // Habilita o PWM no canal
+}
+
+// Função de callback de interrupção dos botões
+void gpio_irq_handler(uint gpio, uint32_t events){
+    // Debouncing
+    uint32_t current_time = to_us_since_boot(get_absolute_time()); // Pega o tempo atual e transforma em us
+    // 200ms
+    if(current_time - last_time > 200000){
+        last_time = current_time; // Atualização de tempo do último clique
+
+        if(gpio == button_A){
+            pwm_activate = !pwm_activate;
+        }else if(gpio == joystick_PB){
+            gpio_put(LED_Green, !gpio_get(LED_Green));
+            space += 2;
+            if(space >= 8){
+                space = 1;
+            }
+        }
+    }
+}
+
+// Função que define a intensidade dos LEDs Azul e Vermelho
+void led_level(uint16_t value_vry, uint16_t value_vrx){
+    // Define o valor do nível de intensidade do LED Azul
+    if(value_vry < vry_min_meio){
+        // "(value_vry/vry_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
+        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
+        LED_Blue_level = (pwm_wrap-(value_vry/vry_min_meio)*pwm_wrap);
+    }else if(value_vry > vry_max_meio){
+        // "((value_vry - vry_max_meio)/(pwm_wrap - vry_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
+        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        LED_Blue_level = (((value_vry-vry_max_meio)/(pwm_wrap-vry_max_meio))*pwm_wrap);
+    }else{
+        LED_Blue_level = 0; // Estando no meio (Entre 1986 - 2084) o LED fica apagado
+    }
+
+    // Define o valor do nível de intensidade do LED Vermelho
+    if(value_vrx < vrx_min_meio){
+        // "(value_vrx/vrx_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
+        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
+        LED_Red_level = (pwm_wrap-(value_vrx/vrx_min_meio)*pwm_wrap);
+    }else if(value_vrx > vrx_max_meio){
+        // "((value_vrx - vrx_max_meio)/(pwm_wrap - vrx_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
+        // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
+        LED_Red_level = (((value_vrx-vrx_max_meio)/(pwm_wrap-vrx_max_meio))*pwm_wrap);
+    }else{
+        LED_Red_level = 0; // Estando no meio (Entre 2040 - 2202) o LED fica apagado
+    }
+
+    pwm_set_gpio_level(LED_Blue, LED_Blue_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Azul
+    pwm_set_gpio_level(LED_Red, LED_Red_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Vermelho
+}
+
+void rect_position(uint16_t value_vry, uint16_t value_vrx){
+    uint y = (1-(value_vry/pwm_wrap))*54;
+    uint x = (value_vrx/pwm_wrap)*118;
+    ssd1306_fill(&ssd, false); // Limpa o display
+    ssd1306_rect(&ssd, y, x, 8, 8, true, gpio_get(LED_Green)); // Desenha um retângulo
+    ssd1306_rect_pont(&ssd, 0, 0, 127, 63, true, false, space);
 }
 
 // -- Função principal
@@ -85,45 +150,33 @@ int main()
     adc_gpio_init(joystick_Y); // Inicia o ADC para o GPIO 26 do VRY do Joystick
     adc_gpio_init(joystick_X); // Inicia o ADC para o GPIO 27 do VRX do Joystick
 
+    // Funções de interrupção dos botões A e do Joystick
+    gpio_set_irq_enabled_with_callback(button_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+    gpio_set_irq_enabled_with_callback(joystick_PB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+
     while (true) {
         adc_select_input(0); // Seleciona o ADC0 referente ao VRY do Joystick (GPIO 26)
         uint16_t value_vry = adc_read(); // Ler o valor do ADC selecionado (ADC0 - VRY) e guarda
         adc_select_input(1); // Seleciona o ADC1 referente ao VRX do Joystick (GPIO 27)
         uint16_t value_vrx = adc_read(); // Ler o valor do ADC selecionado (ADC1 - VRX) e guarda
         
-        // Define o valor do nível de intensidade do LED Azul
-        if(value_vry < vry_min_meio){
-            // "(value_vry/vry_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-            // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-            // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
-            LED_Blue_level = (pwm_wrap-(value_vry/vry_min_meio)*pwm_wrap);
-        }else if(value_vry > vry_max_meio){
-            // "((value_vry - vry_max_meio)/(pwm_wrap - vry_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-            // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-            LED_Blue_level = (((value_vry-vry_max_meio)/(pwm_wrap-vry_max_meio))*pwm_wrap);
+        // Se os LEDs PWM estiverem ativos, chama a função que muda a intensidade
+        if(pwm_activate){
+            led_level(value_vry, value_vrx);
         }else{
-            LED_Blue_level = 0; // Estando no meio (Entre 1986 - 2084) o LED fica apagado
+            pwm_set_gpio_level(LED_Blue, 0); // Apaga o LED Azul
+            pwm_set_gpio_level(LED_Red, 0); // Apaga o LED Vermelho
         }
 
-        // Define o valor do nível de intensidade do LED Azul
-        if(value_vrx < vrx_min_meio){
-            // "(value_vrx/vrx_min_meio)" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-            // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-            // "pwm_wrap -" -> Inverte o valor do nível, para que quando value_vry = 0, a intensidade seja máxima e vice-versa
-            LED_Red_level = (pwm_wrap-(value_vrx/vrx_min_meio)*pwm_wrap);
-        }else if(value_vrx > vrx_max_meio){
-            // "((value_vrx - vrx_max_meio)/(pwm_wrap - vrx_max_meio))" -> Admensionaliza o valor ADC (Resultado entre 0 e 1)
-            // "*pwm_wrap" -> Multiplica o valor admensionalizado pelo valor máximo da intensidade (wrap) (Resultado entre 0-4095)
-            LED_Red_level = (((value_vrx-vrx_max_meio)/(pwm_wrap-vrx_max_meio))*pwm_wrap);
-        }else{
-            LED_Red_level = 0; // Estando no meio (Entre 1986 - 2084) o LED fica apagado
-        }
+        // Define a posição do retângulo 8x8 no display
+        rect_position(value_vry, value_vrx);
+        ssd1306_send_data(&ssd); // Atualiza o display
 
-        pwm_set_gpio_level(LED_Blue, LED_Blue_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Azul
-        pwm_set_gpio_level(LED_Red, LED_Red_level); // Define o nível atual do ciclo de trabalho (DC) do PWM - LED Vermelho
-        // float duty_cicle_blue = (LED_Blue_level/pwm_wrap)*100;
-        // float duty_cicle_red = (LED_Red_level/pwm_wrap)*100;
-        // printf("VRY = %u - Nível azul = %u - DC azul = %.2f --- VRX = %u - Nível vermelho = %u - DC Vermelho = %.2f\n", value_vry, LED_Blue_level, duty_cicle_blue, value_vrx, LED_Red_level, duty_cicle_red);
+        // Acompanhamento dos valores no monitor serial
+        float duty_cicle_blue = (LED_Blue_level/pwm_wrap)*100;
+        float duty_cicle_red = (LED_Red_level/pwm_wrap)*100;
+        printf("VRY = %u - Nível azul = %u - DC azul = %.2f --- VRX = %u - Nível vermelho = %u - DC Vermelho = %.2f\n", value_vry, LED_Blue_level, duty_cicle_blue, value_vrx, LED_Red_level, duty_cicle_red);
+
         sleep_ms(40);
     }
 }
